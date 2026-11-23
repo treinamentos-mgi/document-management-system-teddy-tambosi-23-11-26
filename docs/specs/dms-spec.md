@@ -69,9 +69,9 @@ Extensões e tipos de mídia não listados, pares incompatíveis e arquivos vazi
 | --- | --- |
 | RNF-01 | Os arquivos são gravados exclusivamente no filesystem local da aplicação por meio de Multer `diskStorage`, no diretório `backend/storage` por padrão. Não usar provedores externos ou serviços de armazenamento de terceiros. |
 | RNF-02 | Os metadados permanecem em memória no processo do backend. Reiniciar o processo apaga os registros; arquivos existentes no disco podem ficar órfãos e não são recuperados automaticamente. |
-| RNF-03 | Configurações dependentes do ambiente, como `PORT` e o diretório local de armazenamento (`STORAGE_DIR`, com padrão `backend/storage`), são lidas de variáveis de ambiente. `STORAGE_DIR` continua apontando para filesystem local. |
+| RNF-03 | Configurações dependentes do ambiente, como `PORT`, são lidas de variáveis de ambiente. O diretório de armazenamento de produção é fixo em `backend/storage`. |
 | RNF-04 | O limite máximo do upload é 10 MiB por arquivo. O servidor aplica o limite, independentemente das restrições de interface ou do cabeçalho enviado pelo cliente. |
-| RNF-05 | O sistema não confia em nomes de arquivo fornecidos pelo usuário como caminho de armazenamento. O identificador físico é gerado pelo sistema, e o caminho resolvido deve permanecer dentro do diretório de armazenamento configurado. |
+| RNF-05 | O sistema não confia em nomes de arquivo fornecidos pelo usuário como caminho de armazenamento. O identificador físico é gerado pelo sistema, e o caminho resolvido deve permanecer dentro de `backend/storage`. |
 | RNF-06 | A API usa respostas JSON para metadados e erros, e transferência binária para download. Falhas não devem expor caminhos locais, stack traces ou detalhes internos. |
 | RNF-07 | As camadas do backend mantêm dependências na direção `routes -> controllers -> services -> repositories`; regras de negócio não dependem de Express ou Multer. |
 | RNF-08 | A interface consome a API usando `fetch` sob o prefixo `/api`, conforme a configuração de proxy do Vite. |
@@ -225,7 +225,7 @@ Transfere o arquivo associado ao identificador, somente quando pertence ao usuá
 - Frontend em React e Vite, com componentes funcionais e Hooks; chamadas ao backend via `fetch` e prefixo `/api`.
 - Dependências do backend seguem `routes -> controllers -> services -> repositories`.
 - Rotas registram os endpoints e conectam middleware de upload aos controllers. Controllers tratam HTTP, validação de entrada e serialização de resposta. Services concentram regras de propriedade, ordenação e fluxo de upload/download. Repositories encapsulam o acesso aos metadados e aos arquivos locais.
-- Multer `diskStorage` grava os arquivos em filesystem local, em `backend/storage` por padrão. O nome físico é gerado pelo sistema. O middleware de upload aplica limite de tamanho e allowlist antes de aceitar o arquivo.
+- Multer `diskStorage` grava os arquivos em filesystem local em `backend/storage`. O nome físico é gerado pelo sistema. O middleware de upload aplica limite de tamanho e allowlist antes de aceitar o arquivo.
 - Metadados ficam em repositório em memória. O filesystem local não é um provedor externo; não são usados banco de dados ou armazenamento em nuvem.
 - A resposta pública nunca inclui `storageKey` nem o caminho físico.
 - O cabeçalho `X-User-Id` é um identificador fornecido pelo cliente, não autenticação. O MVP não deve ser implantado como sistema com dados que exijam isolamento de segurança entre usuários sem adicionar autenticação/autorização numa etapa futura.
