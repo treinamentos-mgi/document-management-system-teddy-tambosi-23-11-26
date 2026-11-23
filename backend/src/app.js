@@ -1,32 +1,58 @@
-// Seed do servidor backend do Document Management System.
-//
-// Este arquivo é apenas um ponto de partida mínimo. Ao longo do workshop você
-// vai usar o Agent Mode do GitHub Copilot para construir as camadas:
-//   - routes/       (definição das rotas)
-//   - controllers/  (entrada HTTP e validação)
-//   - services/     (regras de negócio)
-//   - repositories/ (persistência: arquivos locais + metadados em memória)
-//
-// Restrição do projeto: uploads são gravados no filesystem local da aplicação
-// usando multer com diskStorage. Não utilize provedores externos.
-
 const express = require('express');
+const path = require('node:path');
+const { createDocumentController } = require('./controllers/documentController');
+const { createDocumentRoutes } = require('./routes/documentRoutes');
+const { DocumentRepository } = require('./repositories/documentRepository');
+const { LocalFileRepository } = require('./repositories/localFileRepository');
+const { DocumentService } = require('./services/documentService');
 
-const app = express();
 const PORT = process.env.PORT || 3000;
+const STORAGE_DIR = path.join(__dirname, '..', 'storage');
 
-app.use(express.json());
+function createApp({ storageDir = STORAGE_DIR } = {}) {
+  const documentRepository = new DocumentRepository();
+  const fileRepository = new LocalFileRepository(storageDir);
+  const documentService = new DocumentService(documentRepository, fileRepository);
+  const documentController = createDocumentController(documentService);
+  const app = express();
 
-// Endpoint de verificação de saúde. As demais rotas (/upload, /documents,
-// /documents/:id/download) serão implementadas durante o Passo 2.
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`DMS backend ouvindo na porta ${PORT}`);
+  app.use(express.json());
+  app.get('/health', (req, res) => {
+    res.json({ status: 'ok' });
   });
+  app.use('/', createDocumentRoutes({ controller: documentController, storageDir }));
+  app.use((error, req, res, next) => {
+    if (res.headersSent) {
+      return next(error);
+    }
+
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({
+        error: { code: 'FILE_TOO_LARGE', message: 'O arquivo excede o limite de 10 MiB.' },
+      });
+    }
+
+    if (error.code === 'LIMIT_UNEXPECTED_FILE' || error.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({
+        error: { code: 'FILE_COUNT_EXCEEDED', message: 'Envie somente um arquivo no campo file.' },
+      });
+    }
+
+    const status = error.statusCode || 500;
+    const code = error.code || 'INTERNAL_SERVER_ERROR';
+    const message = status < 500 ? error.message : 'Ocorreu um erro interno.';
+
+    return res.status(status).json({ error: { code, message } });
+  });
+
+  return app;
 }
 
+const app = createApp();
+
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`DMS backend ouvindo na porta ${PORT}`));
+}
+
+app.createApp = createApp;
 module.exports = app;
